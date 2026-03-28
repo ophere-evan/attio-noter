@@ -19,11 +19,22 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      return res.status(response.status).json({ error: err?.detail || "Attio error" });
+      return res.status(response.status).json({ error: err?.detail || err?.message || JSON.stringify(err) });
     }
 
     const data = await response.json();
-    res.status(200).json({ records: data.data || [] });
+    const records = data.data || [];
+
+    // Normalise: make sure every record exposes a flat record_id
+    const normalised = records.map((r) => ({
+      ...r,
+      id: {
+        ...r.id,
+        record_id: r.id?.record_id ?? r.id?.object_id ?? r.id ?? null,
+      },
+    }));
+
+    res.status(200).json({ records: normalised });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
