@@ -168,7 +168,7 @@ export default function Home() {
       <div style={{ width: "100%", maxWidth: 580 }}>
         <div style={{ marginBottom: "2rem" }}>
           <div style={{ marginBottom: "1.5rem" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 264.28 113" style={{ height: 28, width: "auto", display: "block" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 264.28 113" style={{ height: 84, width: "auto", display: "block" }}>
               <g>
                 <path fill="#161818" d="M0,65.33h7.48l13.89,39.46,13.82-39.46h7.54l-16.83,46.74h-9.08L0,65.33Z"/>
                 <path fill="#161818" d="M43.07,95.84c0-10.35,6.41-16.83,15.56-16.83s15.42,6.21,15.42,16.02c0,.87-.07,1.74-.2,3.07h-24.37c.27,5.88,3.87,9.41,9.61,9.41,3.81,0,6.48-1.74,7.75-4.61h6.61c-2,6.21-6.94,10.08-14.36,10.08-9.61,0-16.02-6.74-16.02-17.16ZM67.5,93.04v-.33c0-4.94-3.2-8.48-8.88-8.48s-8.88,3.61-9.15,8.81h18.03Z"/>
