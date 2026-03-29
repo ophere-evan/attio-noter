@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 
 const getRecordName = (record) => {
   const nameVals = record?.values?.name;
@@ -71,9 +71,9 @@ export default function Home() {
   const [step, setStep] = useState(1);
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [interimText, setInterimText] = useState("");
   const [summary, setSummary] = useState("");
   const [noteTitle, setNoteTitle] = useState("");
+  const [transcribing, setTranscribing] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
   const [searchType, setSearchType] = useState("companies");
   const [searchQuery, setSearchQuery] = useState("");
@@ -82,51 +82,82 @@ export default function Home() {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
-  const [browserSupported, setBrowserSupported] = useState(true);
-  const recognitionRef = useRef(null);
-  const transcriptRef = useRef("");
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
+  const mimeTypeRef = useRef("audio/webm");
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) setBrowserSupported(false);
-    }
-  }, []);
-
-  const startRecording = () => {
+  const startRecording = async () => {
     setError("");
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setError("Speech recognition is not supported in this browser. Please use Chrome."); return; }
-    const recognition = new SR();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-    recognition.onresult = (e) => {
-      let interim = "";
-      let finalChunk = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finalChunk += e.results[i][0].transcript + " ";
-        else interim += e.results[i][0].transcript;
-      }
-      if (finalChunk) { transcriptRef.current += finalChunk; setTranscript(transcriptRef.current); }
-      setInterimText(interim);
-    };
-    recognition.onerror = (e) => { if (e.error !== "aborted") setError("Microphone error: " + e.error); setRecording(false); };
-    recognition.onend = () => { setRecording(false); setInterimText(""); };
-    recognitionRef.current = recognition;
-    recognition.start();
-    setRecording(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "audio/ogg";
+      mimeTypeRef.current = mimeType;
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mediaRecorder.start(250);
+      mediaRecorderRef.current = mediaRecorder;
+      setRecording(true);
+      setRecordingTime(0);
+      timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+    } catch (e) {
+      setError("Microphone access denied. Please allow microphone permissions and try again.");
+    }
   };
 
-  const stopRecording = () => { recognitionRef.current?.stop(); setRecording(false); setInterimText(""); };
-  const clearAndReRecord = () => { transcriptRef.current = ""; setTranscript(""); setInterimText(""); setError(""); };
+  const stopRecording = () => {
+    clearInterval(timerRef.current);
+    const mediaRecorder = mediaRecorderRef.current;
+    if (!mediaRecorder) return;
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    setRecording(false);
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(chunksRef.current, { type: mimeTypeRef.current });
+      await transcribeAudio(blob, mimeTypeRef.current);
+    };
+  };
+
+  const transcribeAudio = async (blob, mimeType) => {
+    setTranscribing(true);
+    setError("");
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+        const base64 = reader.result.split(",")[1];
+        const res = await fetch("/api/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audio: base64, mimeType }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Transcription failed");
+        setTranscript(data.transcript);
+        setTranscribing(false);
+      };
+    } catch (e) {
+      setError(e.message);
+      setTranscribing(false);
+    }
+  };
+
+  const clearAndReRecord = () => { setTranscript(""); setError(""); setRecordingTime(0); };
+
+  const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
   const defaultTitle = () => "Voice note — " + new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   const summarize = async () => {
     setSummarizing(true); setError("");
     try {
-      const res = await fetch("/api/summarize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transcript }) });
+      const res = await fetch("/api/summarize", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Summarization failed");
       setSummary(data.summary); setNoteTitle(defaultTitle()); setStep(2);
@@ -139,7 +170,10 @@ export default function Home() {
     if (!searchQuery.trim()) return;
     setSearching(true); setError(""); setSearchResults([]); setSelectedRecord(null);
     try {
-      const res = await fetch("/api/attio-search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ objectType: searchType, query: searchQuery }) });
+      const res = await fetch("/api/attio-search", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ objectType: searchType, query: searchQuery }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Search failed");
       setSearchResults(data.records || []);
@@ -150,7 +184,10 @@ export default function Home() {
     if (!selectedRecord) return;
     setPosting(true); setError("");
     try {
-      const res = await fetch("/api/attio-note", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ objectType: searchType, recordId: selectedRecord.id.record_id, title: noteTitle, content: summary }) });
+      const res = await fetch("/api/attio-note", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ objectType: searchType, recordId: selectedRecord.id.record_id, title: noteTitle, content: summary }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to post note");
       setStep(4);
@@ -158,14 +195,15 @@ export default function Home() {
   };
 
   const reset = () => {
-    setStep(1); transcriptRef.current = ""; setTranscript(""); setInterimText("");
-    setSummary(""); setNoteTitle(""); setSelectedRecord(null); setSearchResults([]); setSearchQuery(""); setError("");
+    setStep(1); setTranscript(""); setSummary(""); setNoteTitle("");
+    setSelectedRecord(null); setSearchResults([]); setSearchQuery(""); setError(""); setRecordingTime(0);
   };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f9f9f8", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "3rem 1rem", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
       <div style={{ width: "100%", maxWidth: 580 }}>
+
         <div style={{ marginBottom: "2rem" }}>
           <div style={{ marginBottom: "1.5rem" }}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 264.28 113" style={{ height: 84, width: "auto", display: "block" }}>
@@ -193,47 +231,53 @@ export default function Home() {
           <p style={{ fontSize: 13, color: "#888", margin: "0 0 4px" }}>Voice → Claude → Attio</p>
           <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: "#111" }}>Record a voice note to CRM</h1>
         </div>
+
         <StepBar current={step} />
+
         <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1.5rem" }}>
 
           {step === 1 && (
             <>
               <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 500 }}>Record your voice note</h2>
-              <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 24 }}>Hit record and speak naturally — mention the company, person, key topics, next steps. Claude will clean it up.</p>
-              {!browserSupported && (
-                <div style={{ background: "#fff8e1", color: "#7a5c00", border: "0.5px solid #f5d97a", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>
-                  Your browser does not support speech recognition. Please open this in Chrome.
-                </div>
-              )}
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>
-                <button onClick={recording ? stopRecording : startRecording} disabled={!browserSupported}
+              <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 24 }}>
+                Speak naturally — mention the company, person, key topics, next steps. Whisper will transcribe it, Claude will clean it up.
+              </p>
+
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+                <button onClick={recording ? stopRecording : startRecording}
                   style={{ width: 80, height: 80, borderRadius: "50%", border: "none", cursor: "pointer", background: recording ? "#e74c3c" : "#111", color: "#fff", fontSize: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {recording ? "■" : "●"}
                 </button>
               </div>
+
               <div style={{ textAlign: "center", marginBottom: 20, minHeight: 22 }}>
                 {recording ? (
-                  <span style={{ fontSize: 13, color: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#e74c3c", marginRight: 8, animation: "pulse 1.2s ease-in-out infinite" }} />
-                    Recording — speak now
+                  <span style={{ fontSize: 13, color: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                    <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#e74c3c", animation: "pulse 1.2s ease-in-out infinite" }} />
+                    Recording — {formatTime(recordingTime)}
                   </span>
+                ) : transcribing ? (
+                  <span style={{ fontSize: 13, color: "#888" }}>Transcribing…</span>
                 ) : transcript ? (
-                  <span style={{ fontSize: 13, color: "#2d7a4f" }}>Recording stopped — transcript ready</span>
+                  <span style={{ fontSize: 13, color: "#2d7a4f" }}>Transcript ready</span>
                 ) : (
                   <span style={{ fontSize: 13, color: "#aaa" }}>Press ● to start recording</span>
                 )}
               </div>
-              {(transcript || interimText) && (
-                <div style={{ background: "#fafaf9", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "12px 14px", fontSize: 13, lineHeight: 1.7, minHeight: 80, marginBottom: 16, color: "#333" }}>
-                  {transcript}<span style={{ color: "#aaa" }}>{interimText}</span>
-                </div>
-              )}
+
               {transcript && !recording && (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={summarize} disabled={summarizing} style={btnStyle("primary", summarizing)}>{summarizing ? "Summarizing…" : "Summarize with Claude"}</button>
-                  <button onClick={skipSummary} style={btnStyle("ghost")}>Use as-is</button>
-                  <button onClick={clearAndReRecord} style={btnStyle("ghost")}>Re-record</button>
-                </div>
+                <>
+                  <label style={labelStyle}>Transcript</label>
+                  <textarea rows={6} value={transcript} onChange={e => setTranscript(e.target.value)}
+                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.7, marginBottom: 16 }} />
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button onClick={summarize} disabled={summarizing} style={btnStyle("primary", summarizing)}>
+                      {summarizing ? "Summarizing…" : "Summarize with Claude"}
+                    </button>
+                    <button onClick={skipSummary} style={btnStyle("ghost")}>Use as-is</button>
+                    <button onClick={clearAndReRecord} style={btnStyle("ghost")}>Re-record</button>
+                  </div>
+                </>
               )}
             </>
           )}
@@ -245,7 +289,8 @@ export default function Home() {
               <label style={labelStyle}>Note title</label>
               <input value={noteTitle} onChange={e => setNoteTitle(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }} />
               <label style={labelStyle}>Note content</label>
-              <textarea rows={10} value={summary} onChange={e => setSummary(e.target.value)} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.7 }} />
+              <textarea rows={10} value={summary} onChange={e => setSummary(e.target.value)}
+                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.7 }} />
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
                 <button onClick={() => setStep(3)} disabled={!summary.trim()} style={btnStyle("primary", !summary.trim())}>Choose CRM record →</button>
                 <button onClick={() => setStep(1)} style={btnStyle("ghost")}>Back</button>
@@ -269,7 +314,9 @@ export default function Home() {
               <div style={{ display: "flex", gap: 8 }}>
                 <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && searchAttio()}
                   placeholder={searchType === "companies" ? "e.g. Acme Corp" : "e.g. Sarah Chen"} style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={searchAttio} disabled={searching || !searchQuery.trim()} style={btnStyle("primary", searching || !searchQuery.trim())}>{searching ? "…" : "Search"}</button>
+                <button onClick={searchAttio} disabled={searching || !searchQuery.trim()} style={btnStyle("primary", searching || !searchQuery.trim())}>
+                  {searching ? "…" : "Search"}
+                </button>
               </div>
               {searchResults.length > 0 && (
                 <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
@@ -311,8 +358,9 @@ export default function Home() {
             <div style={{ background: "#fff5f5", color: "#c0392b", border: "0.5px solid #f5c6c6", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginTop: 12 }}>{error}</div>
           )}
         </div>
+
         <p style={{ fontSize: 11, color: "#bbb", marginTop: 16, textAlign: "center" }}>
-          Voice is transcribed locally in your browser — audio never leaves your device. Works best in Chrome.
+          Audio is transcribed via OpenAI Whisper. Works on all devices including iPhone.
         </p>
       </div>
     </div>
