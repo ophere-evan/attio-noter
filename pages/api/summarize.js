@@ -17,7 +17,17 @@ export default async function handler(req, res) {
         max_tokens: 1000,
         messages: [{
           role: "user",
-          content: `You are a VC fund analyst. Summarize this Claude chat transcript into a clean CRM note. Include: key topics, decisions, action items, and any important context. Be concise and professional.\n\nTranscript:\n${transcript}`,
+          content: `You are a VC fund analyst at Sticker Ventures. Summarize this voice note into a concise CRM note. 
+
+Rules:
+- Use today's date: ${new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+- No markdown bold (no ** anywhere)
+- No Action Items section
+- Sections: Date, Meeting Type, Key Topics, Financial Metrics (only if numbers/revenue/funding mentioned), Next Steps only
+- Keep it short and informative — bullet points, no fluff
+- If a company name is mentioned, match it to our portfolio if relevant: Prism, Turnout, Gravy Pass, Horizon, SunSay, Archie And Dennis, Highlight Studios, Yomu, Owlue, banditos.studio, Invitfull, Shortical
+
+Voice note:\n${transcript}`,
         }],
       }),
     });
