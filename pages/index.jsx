@@ -16,7 +16,8 @@ const getRecordSub = (record, type) => {
   return [title, company].filter(Boolean).join(" · ");
 };
 
-const steps = ["Record", "Review", "Find record", "Done"];
+const stepsVoice = ["Record", "Review", "Find record", "Done"];
+const stepsFile = ["Upload", "Review", "Find record", "Done"];
 
 const inputStyle = {
   width: "100%", boxSizing: "border-box",
@@ -35,7 +36,7 @@ const btnStyle = (variant, disabled) => ({
     : { background: "transparent", color: "#555", border: "0.5px solid #ddd" }),
 });
 
-function StepBar({ current }) {
+function StepBar({ current, steps }) {
   return (
     <div style={{ display: "flex", alignItems: "center", marginBottom: "2rem" }}>
       {steps.map((label, i) => {
@@ -67,7 +68,16 @@ function StepBar({ current }) {
   );
 }
 
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export default function Home() {
+  const [tab, setTab] = useState("voice");
+  
+  // Voice note state
   const [step, setStep] = useState(1);
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -75,6 +85,17 @@ export default function Home() {
   const [noteTitle, setNoteTitle] = useState("");
   const [transcribing, setTranscribing] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+
+  // File upload state
+  const [stepFile, setStepFile] = useState(1);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [fileBuffer, setFileBuffer] = useState("");
+  const [fileSummary, setFileSummary] = useState("");
+  const [fileNoteTitle, setFileNoteTitle] = useState("");
+  const [extracting, setExtracting] = useState(false);
+
+  // Shared state
   const [searchType, setSearchType] = useState("companies");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -82,12 +103,14 @@ export default function Home() {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
-  const [recordingTime, setRecordingTime] = useState(0);
+
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const mimeTypeRef = useRef("audio/webm");
+  const fileInputRef = useRef(null);
 
+  // ===== VOICE NOTE FUNCTIONS =====
   const startRecording = async () => {
     setError("");
     try {
@@ -145,160 +168,306 @@ export default function Home() {
     }
   };
 
-  const clearAndReRecord = () => { setTranscript(""); setError(""); setRecordingTime(0); };
-
-  const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
-
-  const defaultTitle = () => "Voice note — " + new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-
   const summarize = async () => {
-    setSummarizing(true); setError("");
+    setSummarizing(true);
+    setError("");
     try {
       const res = await fetch("/api/summarize", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Summarization failed");
-      setSummary(data.summary); setNoteTitle(defaultTitle()); setStep(2);
-    } catch (e) { setError(e.message); } finally { setSummarizing(false); }
+      setSummary(data.summary);
+      setNoteTitle(transcript.split("\n")[0].slice(0, 60));
+      setSummarizing(false);
+      setStep(2);
+    } catch (e) {
+      setError(e.message);
+      setSummarizing(false);
+    }
   };
 
-  const skipSummary = () => { setSummary(transcript); setNoteTitle(defaultTitle()); setStep(2); };
+  const skipSummary = () => {
+    setSummary(transcript);
+    setNoteTitle(transcript.split("\n")[0].slice(0, 60));
+    setStep(2);
+  };
 
+  const clearAndReRecord = () => { setTranscript(""); setError(""); setRecordingTime(0); };
+
+  // ===== FILE UPLOAD FUNCTIONS =====
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-excel", "text/csv"];
+    if (!allowedTypes.includes(file.type)) {
+      setError("Unsupported file type. Please upload PDF, Word, Excel, or CSV.");
+      return;
+    }
+
+    setUploadedFile(file);
+    setError("");
+    extractAndSummarizeFile(file);
+  };
+
+  const extractAndSummarizeFile = async (file) => {
+    setExtracting(true);
+    setError("");
+    try {
+      const reader = new FileReader();
+      reader.readAsArrayBuffer(file);
+      reader.onloadend = async () => {
+        const buffer = reader.result;
+        const base64 = Buffer.from(new Uint8Array(buffer)).toString("base64");
+        setFileBuffer(base64);
+
+        const res = await fetch("/api/extract-and-summarize-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileBuffer: base64, fileName: file.name }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "File processing failed");
+
+        setFileSummary(data.summary);
+        setFileNoteTitle(`${file.name.split(".")[0]} — Summary`);
+        setExtracting(false);
+        setStepFile(2);
+      };
+    } catch (e) {
+      setError(e.message);
+      setExtracting(false);
+    }
+  };
+
+  const clearAndReUpload = () => { setUploadedFile(null); setFileSummary(""); setError(""); fileInputRef.current?.click(); };
+
+  // ===== SHARED FUNCTIONS =====
   const searchAttio = async () => {
-    if (!searchQuery.trim()) return;
-    setSearching(true); setError(""); setSearchResults([]); setSelectedRecord(null);
+    setSearching(true);
+    setError("");
     try {
       const res = await fetch("/api/attio-search", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ objectType: searchType, query: searchQuery }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Search failed");
       setSearchResults(data.records || []);
-    } catch (e) { setError(e.message); } finally { setSearching(false); }
+      setSearching(false);
+    } catch (e) {
+      setError(e.message);
+      setSearching(false);
+    }
   };
 
   const postNote = async () => {
     if (!selectedRecord) return;
-    setPosting(true); setError("");
+    setPosting(true);
+    setError("");
+
+    const currentSummary = tab === "voice" ? summary : fileSummary;
+    const currentTitle = tab === "voice" ? noteTitle : fileNoteTitle;
+    const fileLink = tab === "file" && uploadedFile ? `\n\nFile: ${uploadedFile.name}` : "";
+
     try {
       const res = await fetch("/api/attio-note", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ objectType: searchType, recordId: selectedRecord.id.record_id, title: noteTitle, content: summary }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          objectType: searchType,
+          recordId: selectedRecord.id?.record_id,
+          title: currentTitle,
+          content: currentSummary + fileLink,
+        }),
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to post note");
-      setStep(4);
-    } catch (e) { setError(e.message); } finally { setPosting(false); }
+      setPosting(false);
+
+      if (tab === "voice") {
+        setStep(4);
+      } else {
+        setStepFile(4);
+      }
+    } catch (e) {
+      setError(e.message);
+      setPosting(false);
+    }
   };
 
   const reset = () => {
-    setStep(1); setTranscript(""); setSummary(""); setNoteTitle("");
-    setSelectedRecord(null); setSearchResults([]); setSearchQuery(""); setError(""); setRecordingTime(0);
+    if (tab === "voice") {
+      setStep(1);
+      setTranscript("");
+      setSummary("");
+      setNoteTitle("");
+      setRecordingTime(0);
+    } else {
+      setStepFile(1);
+      setUploadedFile(null);
+      setFileSummary("");
+      setFileNoteTitle("");
+    }
+    setSearchQuery("");
+    setSearchResults([]);
+    setSelectedRecord(null);
+    setError("");
   };
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#f9f9f8", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "3rem 1rem", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
-      <div style={{ width: "100%", maxWidth: 580 }}>
+  const currentStep = tab === "voice" ? step : stepFile;
+  const steps = tab === "voice" ? stepsVoice : stepsFile;
 
+  return (
+    <div style={{ background: "#fafaf9", minHeight: "100vh", padding: "2rem", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
+
+      <div style={{ maxWidth: 600, margin: "0 auto" }}>
         <div style={{ marginBottom: "2rem" }}>
-          <div style={{ marginBottom: "1.5rem" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 264.28 113" style={{ height: 84, width: "auto", display: "block" }}>
-              <g>
-                <path fill="#161818" d="M0,65.33h7.48l13.89,39.46,13.82-39.46h7.54l-16.83,46.74h-9.08L0,65.33Z"/>
-                <path fill="#161818" d="M43.07,95.84c0-10.35,6.41-16.83,15.56-16.83s15.42,6.21,15.42,16.02c0,.87-.07,1.74-.2,3.07h-24.37c.27,5.88,3.87,9.41,9.61,9.41,3.81,0,6.48-1.74,7.75-4.61h6.61c-2,6.21-6.94,10.08-14.36,10.08-9.61,0-16.02-6.74-16.02-17.16ZM67.5,93.04v-.33c0-4.94-3.2-8.48-8.88-8.48s-8.88,3.61-9.15,8.81h18.03Z"/>
-                <path fill="#161818" d="M81.86,79.95h5.74v4.21c1.94-3.47,5.81-5.14,10.15-5.14,7.88,0,12.82,4.81,12.82,13.69v19.36h-6.48v-18.76c0-5.74-2.8-8.41-7.54-8.41s-8.21,3.41-8.21,8.61v18.56h-6.48v-32.12Z"/>
-                <path fill="#161818" d="M118.66,104.32v-33.98h6.48v9.61h10.08v5.68h-10.08v17.43c0,2.34.93,3.34,3.4,3.34h6.68v5.68h-8.61c-5.54,0-7.95-2.2-7.95-7.75Z"/>
-                <path fill="#161818" d="M141.42,99.31v-19.36h6.48v18.76c0,5.74,2.67,8.41,7.34,8.41s8.01-3.47,8.01-8.61v-18.56h6.48v32.12h-5.74v-3.67c-2.14,3.14-5.81,4.61-9.95,4.61-7.81,0-12.62-4.81-12.62-13.69Z"/>
-                <path fill="#161818" d="M179.62,79.95h5.74v5.21c.8-3.21,3.2-5.21,7.01-5.21h6.14v5.68h-6.74c-4.01,0-5.68,2.27-5.68,6.61v19.83h-6.48v-32.12Z"/>
-                <path fill="#161818" d="M200.78,95.84c0-10.35,6.41-16.83,15.56-16.83s15.42,6.21,15.42,16.02c0,.87-.07,1.74-.2,3.07h-24.37c.27,5.88,3.87,9.41,9.61,9.41,3.81,0,6.48-1.74,7.75-4.61h6.61c-2,6.21-6.94,10.08-14.36,10.08-9.61,0-16.02-6.74-16.02-17.16ZM225.22,93.04v-.33c0-4.94-3.2-8.48-8.88-8.48s-8.88,3.61-9.15,8.81h18.03Z"/>
-                <path fill="#161818" d="M236.57,102.92h6.68c.33,3.2,2.94,4.81,7.61,4.81,4.27,0,6.88-1.8,6.88-4.74,0-2.4-1.8-3.81-5.14-4.14l-5.14-.53c-6.01-.6-9.81-3.94-9.81-9.28,0-6.14,5.14-10.01,13.02-10.01s12.95,3.34,13.35,9.88h-6.48c-.2-3.07-2.74-4.61-6.94-4.61s-6.54,1.67-6.54,4.41c0,2.34,1.74,3.61,5.47,4.07l5.21.6c6.08.67,9.55,4.07,9.55,9.35,0,6.28-5.27,10.28-13.55,10.28s-13.82-3.47-14.15-10.08Z"/>
-              </g>
-              <g>
-                <path fill="#161818" d="M0,33.38h6.88c.07,5.68,4.47,9.28,11.68,9.28,6.41,0,10.48-3.34,10.48-8.41,0-4.07-2.6-6.54-7.95-7.28l-6.14-.87C6.01,24.9,1.54,20.5,1.54,13.49,1.54,5.27,8.15,0,18.23,0s16.89,5.07,17.09,13.22h-6.88c-.2-4.54-4.07-7.34-10.22-7.34s-9.75,2.8-9.75,7.21c0,3.81,2.74,5.94,8.48,6.74l5.81.8c8.68,1.2,13.22,5.68,13.22,13.22,0,8.95-6.61,14.76-17.43,14.76C7.01,48.61.07,42.8,0,33.38Z"/>
-                <path fill="#161818" d="M43.41,39.93V5.94h6.48v9.61h10.08v5.68h-10.08v17.43c0,2.34.93,3.34,3.4,3.34h6.68v5.68h-8.61c-5.54,0-7.95-2.2-7.95-7.75Z"/>
-                <path fill="#161818" d="M66.44,1.4h7.21v7.68h-7.21V1.4ZM66.84,15.56h6.48v32.12h-6.48V15.56Z"/>
-                <path fill="#161818" d="M81.33,31.71c0-10.02,6.54-17.09,16.22-17.09,8.15,0,13.69,4.74,14.42,11.48h-6.61c-.6-3-3.27-5.61-7.88-5.61-5.74,0-9.48,4.34-9.48,11.08s3.81,11.15,9.35,11.15c4.34,0,7.48-2.54,8.15-6.28h6.61c-.87,6.41-6.21,12.15-14.96,12.15-9.61,0-15.82-7.14-15.82-16.89Z"/>
-                <path fill="#161818" d="M128.6,33.25h-3.41v14.42h-6.48V.93h6.48v26.31h3.41l10.82-11.68h7.95l-13.09,14.56,13.09,17.56h-7.81l-10.95-14.42Z"/>
-                <path fill="#161818" d="M149.77,31.45c0-10.35,6.41-16.83,15.56-16.83s15.42,6.21,15.42,16.02c0,.87-.07,1.74-.2,3.07h-24.37c.27,5.88,3.87,9.41,9.61,9.41,3.81,0,6.48-1.74,7.75-4.61h6.61c-2,6.21-6.94,10.08-14.36,10.08-9.61,0-16.02-6.74-16.02-17.16ZM174.21,28.64v-.33c0-4.94-3.2-8.48-8.88-8.48s-8.88,3.61-9.15,8.81h18.03Z"/>
-                <path fill="#161818" d="M188.56,15.56h5.74v5.21c.8-3.21,3.2-5.21,7.01-5.21h6.14v5.68h-6.74c-4.01,0-5.68,2.27-5.68,6.61v19.83h-6.48V15.56Z"/>
-              </g>
-            </svg>
-          </div>
-          <p style={{ fontSize: 13, color: "#888", margin: "0 0 4px" }}>Voice → Claude → Attio</p>
-          <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: "#111" }}>Record a voice note to CRM</h1>
+          <p style={{ fontSize: 13, color: "#888", margin: "0 0 4px" }}>Voice & File → Claude → Attio</p>
+          <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: "#111" }}>Add notes to Attio</h1>
         </div>
 
-        <StepBar current={step} />
+        {/* Tab Selector */}
+        <div style={{ display: "flex", gap: 8, marginBottom: "2rem", borderBottom: "0.5px solid #e5e5e5", paddingBottom: 12 }}>
+          <button onClick={() => { setTab("voice"); setError(""); setSelectedRecord(null); setSearchResults([]); }}
+            style={{ padding: "8px 16px", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer", background: tab === "voice" ? "#111" : "transparent", color: tab === "voice" ? "#fff" : "#666", border: "none" }}>
+            🎙️ Voice Note
+          </button>
+          <button onClick={() => { setTab("file"); setError(""); setSelectedRecord(null); setSearchResults([]); }}
+            style={{ padding: "8px 16px", borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: "pointer", background: tab === "file" ? "#111" : "transparent", color: tab === "file" ? "#fff" : "#666", border: "none" }}>
+            📄 Upload File
+          </button>
+        </div>
+
+        <StepBar current={currentStep} steps={steps} />
 
         <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1.5rem" }}>
 
-          {step === 1 && (
+          {/* ===== VOICE NOTE TAB ===== */}
+          {tab === "voice" && (
             <>
-              <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 500 }}>Record your voice note</h2>
-              <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 24 }}>
-                Speak naturally — mention the company, person, key topics, next steps. Whisper will transcribe it, Claude will clean it up.
-              </p>
-
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-                <button onClick={recording ? stopRecording : startRecording}
-                  style={{ width: 80, height: 80, borderRadius: "50%", border: "none", cursor: "pointer", background: recording ? "#e74c3c" : "#111", color: "#fff", fontSize: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {recording ? "■" : "●"}
-                </button>
-              </div>
-
-              <div style={{ textAlign: "center", marginBottom: 20, minHeight: 22 }}>
-                {recording ? (
-                  <span style={{ fontSize: 13, color: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#e74c3c", animation: "pulse 1.2s ease-in-out infinite" }} />
-                    Recording — {formatTime(recordingTime)}
-                  </span>
-                ) : transcribing ? (
-                  <span style={{ fontSize: 13, color: "#888" }}>Transcribing…</span>
-                ) : transcript ? (
-                  <span style={{ fontSize: 13, color: "#2d7a4f" }}>Transcript ready</span>
-                ) : (
-                  <span style={{ fontSize: 13, color: "#aaa" }}>Press ● to start recording</span>
-                )}
-              </div>
-
-              {transcript && !recording && (
+              {step === 1 && (
                 <>
-                  <label style={labelStyle}>Transcript</label>
-                  <textarea rows={6} value={transcript} onChange={e => setTranscript(e.target.value)}
-                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.7, marginBottom: 16 }} />
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button onClick={summarize} disabled={summarizing} style={btnStyle("primary", summarizing)}>
-                      {summarizing ? "Summarizing…" : "Summarize with Claude"}
+                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 500 }}>Record your voice note</h2>
+                  <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 24 }}>Speak naturally — mention the company, person, key topics, next steps.</p>
+
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+                    <button onClick={recording ? stopRecording : startRecording}
+                      style={{ width: 80, height: 80, borderRadius: "50%", border: "none", cursor: "pointer", background: recording ? "#e74c3c" : "#111", color: "#fff", fontSize: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {recording ? "■" : "●"}
                     </button>
-                    <button onClick={skipSummary} style={btnStyle("ghost")}>Use as-is</button>
-                    <button onClick={clearAndReRecord} style={btnStyle("ghost")}>Re-record</button>
+                  </div>
+
+                  <div style={{ textAlign: "center", marginBottom: 20, minHeight: 22 }}>
+                    {recording ? (
+                      <span style={{ fontSize: 13, color: "#e74c3c", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                        <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#e74c3c", animation: "pulse 1.2s ease-in-out infinite" }} />
+                        Recording — {formatTime(recordingTime)}
+                      </span>
+                    ) : transcribing ? (
+                      <span style={{ fontSize: 13, color: "#888" }}>Transcribing…</span>
+                    ) : transcript ? (
+                      <span style={{ fontSize: 13, color: "#2d7a4f" }}>Transcript ready</span>
+                    ) : (
+                      <span style={{ fontSize: 13, color: "#aaa" }}>Press ● to start recording</span>
+                    )}
+                  </div>
+
+                  {transcript && !recording && (
+                    <>
+                      <label style={labelStyle}>Transcript</label>
+                      <textarea rows={6} value={transcript} onChange={e => setTranscript(e.target.value)}
+                        style={{ ...inputStyle, resize: "vertical", lineHeight: 1.7, marginBottom: 16 }} />
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button onClick={summarize} disabled={summarizing} style={btnStyle("primary", summarizing)}>
+                          {summarizing ? "Summarizing…" : "Summarize with Claude"}
+                        </button>
+                        <button onClick={skipSummary} style={btnStyle("ghost")}>Use as-is</button>
+                        <button onClick={clearAndReRecord} style={btnStyle("ghost")}>Re-record</button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 500 }}>Review note content</h2>
+                  <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 20 }}>Edit before posting to Attio.</p>
+                  <label style={labelStyle}>Note title</label>
+                  <input value={noteTitle} onChange={e => setNoteTitle(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }} />
+                  <label style={labelStyle}>Note content</label>
+                  <textarea rows={10} value={summary} onChange={e => setSummary(e.target.value)}
+                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.7 }} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                    <button onClick={() => setStep(3)} disabled={!summary.trim()} style={btnStyle("primary", !summary.trim())}>Choose CRM record →</button>
+                    <button onClick={() => setStep(1)} style={btnStyle("ghost")}>Back</button>
                   </div>
                 </>
               )}
             </>
           )}
 
-          {step === 2 && (
+          {/* ===== FILE UPLOAD TAB ===== */}
+          {tab === "file" && (
             <>
-              <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 500 }}>Review note content</h2>
-              <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 20 }}>Edit before posting to Attio.</p>
-              <label style={labelStyle}>Note title</label>
-              <input value={noteTitle} onChange={e => setNoteTitle(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }} />
-              <label style={labelStyle}>Note content</label>
-              <textarea rows={10} value={summary} onChange={e => setSummary(e.target.value)}
-                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.7 }} />
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button onClick={() => setStep(3)} disabled={!summary.trim()} style={btnStyle("primary", !summary.trim())}>Choose CRM record →</button>
-                <button onClick={() => setStep(1)} style={btnStyle("ghost")}>Back</button>
-              </div>
+              {stepFile === 1 && (
+                <>
+                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 500 }}>Upload a document</h2>
+                  <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 24 }}>PDF, Word, or Excel files are extracted and summarized with Claude.</p>
+
+                  <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" onChange={handleFileSelect} style={{ display: "none" }} />
+
+                  <div onClick={() => fileInputRef.current?.click()}
+                    style={{ border: "1.5px dashed #ddd", borderRadius: 8, padding: "2rem", textAlign: "center", cursor: "pointer", background: "#fafaf9", marginBottom: 16 }}
+                    onMouseOver={(e) => e.currentTarget.style.borderColor = "#111"}
+                    onMouseOut={(e) => e.currentTarget.style.borderColor = "#ddd"}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>Click to upload or drag file</p>
+                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#888" }}>PDF, Word, Excel (up to 50MB)</p>
+                  </div>
+
+                  {uploadedFile && !extracting && (
+                    <>
+                      <label style={labelStyle}>File selected</label>
+                      <div style={{ padding: "10px 14px", borderRadius: 8, border: "0.5px solid #e5e5e5", background: "#f7f7f6", marginBottom: 16 }}>
+                        <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 500 }}>{uploadedFile.name}</p>
+                        <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{(uploadedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                      </div>
+                    </>
+                  )}
+
+                  {extracting && <div style={{ textAlign: "center", marginTop: 16 }}><p style={{ fontSize: 13, color: "#888" }}>Extracting and summarizing…</p></div>}
+                </>
+              )}
+
+              {stepFile === 2 && (
+                <>
+                  <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 500 }}>Review summary</h2>
+                  <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 20 }}>Edit the summary before posting to Attio.</p>
+                  <label style={labelStyle}>Note title</label>
+                  <input value={fileNoteTitle} onChange={e => setFileNoteTitle(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }} />
+                  <label style={labelStyle}>Note content</label>
+                  <textarea rows={10} value={fileSummary} onChange={e => setFileSummary(e.target.value)}
+                    style={{ ...inputStyle, resize: "vertical", lineHeight: 1.7 }} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                    <button onClick={() => setStepFile(3)} disabled={!fileSummary.trim()} style={btnStyle("primary", !fileSummary.trim())}>Choose CRM record →</button>
+                    <button onClick={clearAndReUpload} style={btnStyle("ghost")}>Re-upload</button>
+                  </div>
+                </>
+              )}
             </>
           )}
 
-          {step === 3 && (
+          {/* ===== SHARED STEPS (Find record + Done) ===== */}
+          {currentStep === 3 && (
             <>
               <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 500 }}>Find the Attio record</h2>
               <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 20 }}>Search for the company or person to attach this note to.</p>
@@ -340,17 +509,17 @@ export default function Home() {
                 <button onClick={postNote} disabled={!selectedRecord || posting} style={btnStyle("primary", !selectedRecord || posting)}>
                   {posting ? "Posting…" : `Post note${selectedRecord ? " to " + getRecordName(selectedRecord) : ""}`}
                 </button>
-                <button onClick={() => setStep(2)} style={btnStyle("ghost")}>Back</button>
+                <button onClick={() => { if (tab === "voice") setStep(2); else setStepFile(2); }} style={btnStyle("ghost")}>Back</button>
               </div>
             </>
           )}
 
-          {step === 4 && (
+          {currentStep === 4 && (
             <div style={{ textAlign: "center", padding: "1.5rem 0" }}>
               <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#e6f4ec", color: "#2d7a4f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, margin: "0 auto 16px" }}>✓</div>
               <h2 style={{ margin: "0 0 8px", fontWeight: 500, fontSize: 18 }}>Note posted to Attio</h2>
-              <p style={{ fontSize: 13, color: "#777", margin: "0 0 24px" }}>"{noteTitle}" was added to {selectedRecord ? getRecordName(selectedRecord) : "the record"}.</p>
-              <button onClick={reset} style={btnStyle("primary")}>Record another</button>
+              <p style={{ fontSize: 13, color: "#777", margin: "0 0 24px" }}>{selectedRecord ? getRecordName(selectedRecord) : "the record"}</p>
+              <button onClick={reset} style={btnStyle("primary")}>Add another note</button>
             </div>
           )}
 
@@ -360,7 +529,7 @@ export default function Home() {
         </div>
 
         <p style={{ fontSize: 11, color: "#bbb", marginTop: 16, textAlign: "center" }}>
-          Audio is transcribed via OpenAI Whisper. Works on all devices including iPhone.
+          {tab === "voice" ? "Audio is transcribed via OpenAI Whisper. Works on all devices." : "Files are processed via Claude API. Supports PDF, Word, Excel, and CSV."}
         </p>
       </div>
     </div>
