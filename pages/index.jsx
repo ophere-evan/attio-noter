@@ -36,6 +36,21 @@ const btnStyle = (variant, disabled) => ({
     : { background: "transparent", color: "#555", border: "0.5px solid #ddd" }),
 });
 
+const DRIVE_FOLDERS = [
+  { name: "Prism",             id: "1UCUS3rvBsSWtygEqp75mbEcX9Hcih3Xy" },
+  { name: "Invitfull",         id: "1cCWK2MdMxepx86XabH4cZRtRi1-di70k" },
+  { name: "Owlue",             id: "1Ixkd5mEv28jIjYc6d708TjkxRyqDXP4f" },
+  { name: "Highlight Studios", id: "1m0nPUyADkjOFLMRS2CQ57iKQpushx0LK" },
+  { name: "Sunsay",            id: "10FM7uZu5Io-ycTnofVhgur3gI7yVjpWW" },
+  { name: "Turnout",           id: "1Z_broWoTPKT2QkNOb-rzdSfpbTHXhH0s" },
+  { name: "YoMu",              id: "17fAo9RmHUWhn30YNdEI2TM-Ghs2OA9_b" },
+  { name: "Horizon",           id: "1I8JuqNBGt1i2u5JeJ2c-Tb5CNEK-FKBi" },
+  { name: "Banditos",          id: "1egzIoR9PriO1GHq_FGPto0e4l7O33MCA" },
+  { name: "Archie & Dennis",   id: "1ZDTrVWuAUYBEJwlFCZ0HnrSI1fqT1dXm" },
+  { name: "Gravy Pass",        id: "1nlirboYEuf1MKhC74z2EYTnJsKdd6Yb2" },
+  { name: "Shortical",         id: "1B0G1KdzuQ2poz7M-ulUS1rCDyroHkDl7" },
+];
+
 function StepBar({ current, steps }) {
   return (
     <div style={{ display: "flex", alignItems: "center", marginBottom: "2rem" }}>
@@ -76,7 +91,7 @@ function formatTime(seconds) {
 
 export default function Home() {
   const [tab, setTab] = useState("voice");
-  
+
   // Voice note state
   const [step, setStep] = useState(1);
   const [recording, setRecording] = useState(false);
@@ -103,6 +118,8 @@ export default function Home() {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
+  const [driveDocUrl, setDriveDocUrl] = useState(null);
+  const [selectedFolder, setSelectedFolder] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -272,8 +289,9 @@ export default function Home() {
     setError("");
 
     const currentSummary = tab === "voice" ? summary : fileSummary;
-    const currentTitle = tab === "voice" ? noteTitle : fileNoteTitle;
+    const currentTitle   = tab === "voice" ? noteTitle : fileNoteTitle;
     const fileLink = tab === "file" && uploadedFile ? `\n\nFile: ${uploadedFile.name}` : "";
+    const noteContent = currentSummary + fileLink;
 
     try {
       const res = await fetch("/api/attio-note", {
@@ -283,19 +301,33 @@ export default function Home() {
           objectType: searchType,
           recordId: selectedRecord.id?.record_id,
           title: currentTitle,
-          content: currentSummary + fileLink,
+          content: noteContent,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to post note");
-      setPosting(false);
 
-      if (tab === "voice") {
-        setStep(4);
-      } else {
-        setStepFile(4);
+      if (selectedFolder) {
+        try {
+          const today = new Date().toISOString().slice(0, 10);
+          const driveRes = await fetch("/api/drive-doc", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              companyName: selectedFolder.name,
+              title: `${today} — ${currentTitle}`,
+              content: noteContent,
+            }),
+          });
+          const driveData = await driveRes.json();
+          if (driveRes.ok && driveData.docUrl) setDriveDocUrl(driveData.docUrl);
+        } catch (_) {}
       }
+
+      setPosting(false);
+      if (tab === "voice") setStep(4);
+      else setStepFile(4);
     } catch (e) {
       setError(e.message);
       setPosting(false);
@@ -303,6 +335,8 @@ export default function Home() {
   };
 
   const reset = () => {
+    setDriveDocUrl(null);
+    setSelectedFolder(null);
     if (tab === "voice") {
       setStep(1);
       setTranscript("");
@@ -330,7 +364,7 @@ export default function Home() {
 
       <div style={{ maxWidth: 600, margin: "0 auto" }}>
         <div style={{ marginBottom: "2rem" }}>
-          <p style={{ fontSize: 13, color: "#888", margin: "0 0 4px" }}>Voice & File → Claude → Attio</p>
+          <p style={{ fontSize: 13, color: "#888", margin: "0 0 4px" }}>Voice & File → Claude → Attio + Drive</p>
           <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: "#111" }}>Add notes to Attio</h1>
         </div>
 
@@ -473,7 +507,7 @@ export default function Home() {
               <p style={{ fontSize: 13, color: "#777", marginTop: 0, marginBottom: 20 }}>Search for the company or person to attach this note to.</p>
               <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                 {["companies", "people"].map(t => (
-                  <button key={t} onClick={() => { setSearchType(t); setSearchResults([]); setSelectedRecord(null); }}
+                  <button key={t} onClick={() => { setSearchType(t); setSearchResults([]); setSelectedRecord(null); setSelectedFolder(null); }}
                     style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, cursor: "pointer", background: searchType === t ? "#111" : "transparent", color: searchType === t ? "#fff" : "#666", border: searchType === t ? "none" : "0.5px solid #ddd" }}>
                     {t === "companies" ? "Company" : "Person"}
                   </button>
@@ -493,7 +527,14 @@ export default function Home() {
                     const name = getRecordName(record); const sub = getRecordSub(record, searchType);
                     const selected = selectedRecord?.id?.record_id === record.id?.record_id;
                     return (
-                      <div key={record.id?.record_id} onClick={() => setSelectedRecord(record)}
+                      <div key={record.id?.record_id} onClick={() => {
+                        setSelectedRecord(record);
+                        const n = getRecordName(record).toLowerCase();
+                        const match = DRIVE_FOLDERS.find(f =>
+                          n.includes(f.name.toLowerCase()) || f.name.toLowerCase().includes(n)
+                        );
+                        setSelectedFolder(match || null);
+                      }}
                         style={{ padding: "10px 14px", borderRadius: 8, cursor: "pointer", border: selected ? "1.5px solid #111" : "0.5px solid #e5e5e5", background: selected ? "#f7f7f6" : "#fff" }}>
                         <p style={{ margin: 0, fontSize: 14, fontWeight: selected ? 500 : 400 }}>{name}</p>
                         {sub && <p style={{ margin: 0, fontSize: 12, color: "#999" }}>{sub}</p>}
@@ -505,6 +546,29 @@ export default function Home() {
               {searchResults.length === 0 && !searching && searchQuery && !error && (
                 <p style={{ fontSize: 13, color: "#aaa", marginTop: 12 }}>No results. Try a different name.</p>
               )}
+
+              {/* Drive folder picker */}
+              <div style={{ marginTop: 24, paddingTop: 20, borderTop: "0.5px solid #f0f0f0" }}>
+                <label style={labelStyle}>Save to Drive folder <span style={{ color: "#aaa", fontWeight: 400 }}>(optional)</span></label>
+                <select
+                  value={selectedFolder?.id || ""}
+                  onChange={e => {
+                    const folder = DRIVE_FOLDERS.find(f => f.id === e.target.value);
+                    setSelectedFolder(folder || null);
+                  }}
+                  style={{ ...inputStyle, marginBottom: 0, cursor: "pointer" }}>
+                  <option value="">— Skip Drive —</option>
+                  {DRIVE_FOLDERS.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                {selectedFolder && (
+                  <p style={{ fontSize: 12, color: "#2d7a4f", marginTop: 6, marginBottom: 0 }}>
+                    ✓ Will save to {selectedFolder.name} folder in Drive
+                  </p>
+                )}
+              </div>
+
               <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
                 <button onClick={postNote} disabled={!selectedRecord || posting} style={btnStyle("primary", !selectedRecord || posting)}>
                   {posting ? "Posting…" : `Post note${selectedRecord ? " to " + getRecordName(selectedRecord) : ""}`}
@@ -519,7 +583,15 @@ export default function Home() {
               <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#e6f4ec", color: "#2d7a4f", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, margin: "0 auto 16px" }}>✓</div>
               <h2 style={{ margin: "0 0 8px", fontWeight: 500, fontSize: 18 }}>Note posted to Attio</h2>
               <p style={{ fontSize: 13, color: "#777", margin: "0 0 24px" }}>{selectedRecord ? getRecordName(selectedRecord) : "the record"}</p>
-              <button onClick={reset} style={btnStyle("primary")}>Add another note</button>
+              {driveDocUrl && (
+                <a href={driveDocUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "inline-block", marginBottom: 20, fontSize: 13, color: "#2d7a4f", textDecoration: "none", border: "0.5px solid #2d7a4f", borderRadius: 8, padding: "8px 16px" }}>
+                  📄 Open in Google Drive →
+                </a>
+              )}
+              <div>
+                <button onClick={reset} style={btnStyle("primary")}>Add another note</button>
+              </div>
             </div>
           )}
 
