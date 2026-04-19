@@ -7,29 +7,21 @@
 
 ## Calendar
 
-Oren's Google Calendar is not accessible via the Google Calendar MCP. Fetch his calendar by downloading the iCal feeds using WebFetch or Bash curl:
+Oren's calendar is NOT accessible via the Google Calendar MCP. Fetch via Bash curl only (WebFetch is blocked by Google on iCal URLs).
 
-Public calendar:
-https://calendar.google.com/calendar/ical/oren%40sticker.vc/public/basic.ics
+Run these two curl commands in parallel:
 
-Private calendar (includes all events):
-https://calendar.google.com/calendar/ical/oren%40sticker.vc/private-f0f8a666315f4fb4784790aef21d4260/basic.ics
+```bash
+curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+  'https://calendar.google.com/calendar/ical/oren%40sticker.vc/public/basic.ics' \
+  -o /tmp/oren-public.ics
 
-Fetch BOTH URLs. Parse the .ics content using python3 to extract today's VEVENT blocks. Filter to events where DTSTART is today (Asia/Jerusalem date). For each event extract: SUMMARY (title), DTSTART, DTEND, LOCATION, DESCRIPTION, ATTENDEE fields. Dedupe across both feeds (same SUMMARY + DTSTART = keep private copy). Sort by start time.
-
-Python3 ics parsing approach:
+curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
+  'https://calendar.google.com/calendar/ical/oren%40sticker.vc/private-f0f8a666315f4fb4784790aef21d4260/basic.ics' \
+  -o /tmp/oren-private.ics
 ```
-import sys, re
-from datetime import datetime, timezone, timedelta
-IDT = timezone(timedelta(hours=3))
-today = datetime.now(IDT).date()
-content = open(sys.argv[1]).read()
-events = content.split('BEGIN:VEVENT')[1:]
-for e in events:
-    start = re.search(r'DTSTART[^:]*:([\d T]+)', e)
-    summary = re.search(r'SUMMARY:(.*)', e)
-    # filter to today and print
-```
+
+Parse with same python3 approach as daniel.md. If both files are empty or curl fails, render "Calendar unavailable" and continue.
 
 ## Tasks
 
