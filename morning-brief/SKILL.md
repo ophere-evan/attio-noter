@@ -33,5 +33,4 @@ For each person below, read their config file and send their brief. Pass the new
 1. Read morning-brief/ophere.md and send Ophere's brief
 2. Read morning-brief/daniel.md and send Danny's brief
 3. Read morning-brief/rachel.md and send Rachel's brief
-
-<!-- DISABLED: morning-brief/oren.md - re-enable once Oren joins Attio -->
+4. Read morning-brief/oren.md and send Oren's brief
