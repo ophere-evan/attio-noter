@@ -28,17 +28,34 @@ For each calendar event with external attendees:
 
 ## Message format
 
-Slack markdown DM to U07JUUN34SJ:
+Slack markdown DM to U07JUUN34SJ. Add a blank line between EVERY individual item (between events, between tasks, between news stories) so nothing runs together.
 
 *Morning Brief — [DayOfWeek] [Mon DD]* | [N] events · [M] tasks · [K] news
 
-*Today's Schedule*
-[events with CRM context]
+―――
+*📅 Today's Schedule*
 
-*Tasks* — [M] open, [X] overdue
-[tasks grouped High/Medium/Normal, overdue first]
+[event 1 with CRM context]
 
-*Consumer & VC News*
-[shared news section passed from orchestrator]
+[event 2 with CRM context]
 
+[event 3 ...]
+
+―――
+*✅ Tasks* — [M] open, [X] overdue
+
+[task 1]
+
+[task 2]
+
+―――
+*📰 Consumer & VC News*
+
+[news story 1]
+
+[news story 2]
+
+[news story 3 ...]
+
+―――
 _[N] events · [M] tasks · largest free block: HH:MM-HH:MM_
