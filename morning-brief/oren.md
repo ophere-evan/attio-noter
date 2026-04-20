@@ -7,21 +7,11 @@
 
 ## Calendar
 
-Oren's calendar is NOT accessible via the Google Calendar MCP. Fetch via Bash curl only (WebFetch is blocked by Google on iCal URLs).
+Oren has shared his calendar with ophere@sticker.vc. Use the Google Calendar MCP directly:
 
-Run these two curl commands in parallel:
+Call list_events with calendarId=oren@sticker.vc for today 00:00–23:59 Asia/Jerusalem.
 
-```bash
-curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
-  'https://calendar.google.com/calendar/ical/oren%40sticker.vc/public/basic.ics' \
-  -o /tmp/oren-public.ics
-
-curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
-  'https://calendar.google.com/calendar/ical/oren%40sticker.vc/private-f0f8a666315f4fb4784790aef21d4260/basic.ics' \
-  -o /tmp/oren-private.ics
-```
-
-Parse with same python3 approach as daniel.md. If both files are empty or curl fails, render "Calendar unavailable" and continue.
+If that fails, render "Calendar unavailable" and continue.
 
 ## Tasks
 
@@ -38,17 +28,28 @@ For each calendar event with external attendees:
 
 ## Message format
 
-Slack markdown DM to U07K7Q9UQCS:
+Slack markdown DM to U07K7Q9UQCS. Add a blank line between EVERY individual item.
 
 *Morning Brief — [DayOfWeek] [Mon DD]* | [N] events · [M] tasks · [K] news
 
+―――
 *Today's Schedule*
-[events with CRM context, or unavailable note]
 
+[event 1 with CRM context]
+
+[event 2 ...]
+
+―――
 *Tasks*
+
 No Attio tasks — Oren is not in the workspace.
 
+―――
 *Consumer & VC News*
-[shared news section passed from orchestrator]
 
+[news story 1]
+
+[news story 2]
+
+―――
 _[N] events · largest free block: HH:MM-HH:MM_
