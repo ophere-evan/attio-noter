@@ -1,6 +1,6 @@
 # Morning Brief — Team Orchestrator
 
-Run the morning brief for active team members in sequence. Timezone: Asia/Jerusalem (IDT, UTC+3). All messages are sent as Slack DMs from this session (authenticated as Ophere Evan).
+Run the morning brief for all active team members in sequence. Timezone: Asia/Jerusalem (IDT, UTC+3). All messages are sent as Slack DMs from this session (authenticated as Ophere Evan).
 
 ## Step 1 — Fetch shared news (once, reused for all briefs)
 
@@ -21,5 +21,6 @@ Read and execute each of these files in order, passing the assembled news sectio
 
 1. morning-brief/ophere.md
 2. morning-brief/daniel.md
+3. morning-brief/rachel.md
 
 <!-- DISABLED: morning-brief/oren.md — Oren not yet on Attio, re-enable once he signs up -->
