@@ -7,63 +7,11 @@
 
 ## Calendar
 
-Rachel's calendar is NOT accessible via the Google Calendar MCP. Fetch via Bash curl only (WebFetch is blocked by Google on iCal URLs).
+Rachel has shared her calendar with ophere@sticker.vc. Use the Google Calendar MCP directly:
 
-Run these two curl commands:
+Call list_events with calendarId=rachel@sticker.vc for today 00:00–23:59 Asia/Jerusalem.
 
-```bash
-curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
-  'https://calendar.google.com/calendar/ical/rachel%40sticker.vc/public/basic.ics' \
-  -o /tmp/rachel-public.ics
-
-curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" \
-  'https://calendar.google.com/calendar/ical/rachel%40sticker.vc/private-0f7868439910bce1fff4e0af0c1a35ae/basic.ics' \
-  -o /tmp/rachel-private.ics
-```
-
-Parse both files with python3 to extract today's VEVENT blocks (Asia/Jerusalem date). Dedupe across both feeds (same SUMMARY + DTSTART = keep private copy). Sort by start time.
-
-Python3 parsing:
-```python
-import re
-from datetime import datetime, timezone, timedelta
-IDT = timezone(timedelta(hours=3))
-today_str = datetime.now(IDT).strftime('%Y%m%d')
-
-def parse_ics(path):
-    try:
-        content = open(path).read()
-    except:
-        return []
-    events = []
-    for block in content.split('BEGIN:VEVENT')[1:]:
-        end = block.find('END:VEVENT')
-        block = block[:end] if end != -1 else block
-        def get(field):
-            m = re.search(r'(?:' + field + r')[^:]*:([^\r\n]+)', block)
-            return m.group(1).strip() if m else ''
-        start = get('DTSTART')
-        if today_str not in start:
-            continue
-        events.append({
-            'summary': get('SUMMARY'),
-            'start': start,
-            'end': get('DTEND'),
-            'location': get('LOCATION'),
-            'attendees': re.findall(r'ATTENDEE[^:]*:mailto:([^\r\n]+)', block)
-        })
-    return events
-
-priv = parse_ics('/tmp/rachel-private.ics')
-pub = parse_ics('/tmp/rachel-public.ics')
-priv_keys = {(e['summary'], e['start']) for e in priv}
-merged = priv + [e for e in pub if (e['summary'], e['start']) not in priv_keys]
-merged.sort(key=lambda e: e['start'])
-for e in merged:
-    print(e)
-```
-
-If both files are empty or curl fails, render "Calendar unavailable" and continue.
+If that fails, fall back to calendarId=rachel@sticker.vc using the primary calendar lookup. If all fail, render "Calendar unavailable" and continue.
 
 ## Tasks
 
