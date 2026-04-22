@@ -2,7 +2,7 @@
 
 - Name: Oren Charnoff
 - Slack user ID (send TO): U07K7Q9UQCS
-- Attio assignee ID: NOT IN ATTIO — skip tasks section, render "No Attio tasks — Oren is not in the workspace"
+- Attio assignee ID: 32e14a57-bf26-4fd3-b11a-9ab9005d88b8
 - Timezone: Asia/Jerusalem
 
 ## Calendar
@@ -15,7 +15,9 @@ If that fails, render "Calendar unavailable" and continue.
 
 ## Tasks
 
-Oren is not a member of the Attio workspace. Render "No Attio tasks — Oren is not in the workspace" and continue.
+Call Attio list-tasks with assignee_workspace_member_id=32e14a57-bf26-4fd3-b11a-9ab9005d88b8 and is_completed=false.
+
+Group by priority (High / Medium / Normal), overdue first with days overdue. Show due date, task content, linked record.
 
 ## CRM Enrichment
 
@@ -28,28 +30,34 @@ For each calendar event with external attendees:
 
 ## Message format
 
-Slack markdown DM to U07K7Q9UQCS. Add a blank line between EVERY individual item.
+Slack markdown DM to U07K7Q9UQCS. Add a blank line between EVERY individual item (between events, between tasks, between news stories) so nothing runs together.
 
 *Morning Brief — [DayOfWeek] [Mon DD]* | [N] events · [M] tasks · [K] news
 
 ―――
-*Today's Schedule*
+*📅 Today's Schedule*
 
 [event 1 with CRM context]
 
-[event 2 ...]
+[event 2 with CRM context]
+
+[event 3 ...]
 
 ―――
-*Tasks*
+*✅ Tasks* — [M] open, [X] overdue
 
-No Attio tasks — Oren is not in the workspace.
+[task 1]
+
+[task 2]
 
 ―――
-*Consumer & VC News*
+*📰 Consumer & VC News*
 
 [news story 1]
 
 [news story 2]
 
+[news story 3 ...]
+
 ―――
-_[N] events · largest free block: HH:MM-HH:MM_
+_[N] events · [M] tasks · largest free block: HH:MM-HH:MM_
