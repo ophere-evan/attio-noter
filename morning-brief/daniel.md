@@ -30,9 +30,14 @@ For each calendar event with external attendees:
 
 Slack markdown DM to U07JUUN34SJ. Add a blank line between EVERY individual item (between events, between tasks, between news stories) so nothing runs together.
 
+News story format — NO emoji on Published line:
+  N. [icon] <URL|Headline> (Source)
+  Published: YYYY-MM-DD (N days ago)
+  Funding: $XXM. Lead: investors. 1-2 sentence VC context.
+
 *Morning Brief — [DayOfWeek] [Mon DD]* | [N] events · [M] tasks · [K] news
 
-―――
+-------------------------------------
 *📅 Today's Schedule*
 
 [event 1 with CRM context]
@@ -41,14 +46,14 @@ Slack markdown DM to U07JUUN34SJ. Add a blank line between EVERY individual item
 
 [event 3 ...]
 
-―――
+-------------------------------------
 *✅ Tasks* — [M] open, [X] overdue
 
 [task 1]
 
 [task 2]
 
-―――
+-------------------------------------
 *📰 Consumer & VC News*
 
 [news story 1]
@@ -57,5 +62,5 @@ Slack markdown DM to U07JUUN34SJ. Add a blank line between EVERY individual item
 
 [news story 3 ...]
 
-―――
+-------------------------------------
 _[N] events · [M] tasks · largest free block: HH:MM-HH:MM_
