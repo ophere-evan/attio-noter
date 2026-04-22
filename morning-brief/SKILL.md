@@ -23,7 +23,7 @@ Deduplication: run `cat sent_news.jsonl` via Bash from the repo root. Skip any s
 
 Format each story:
   N. [icon] <URL|Headline> (Source)
-  📅 Published: YYYY-MM-DD (N days ago)
+  Published: YYYY-MM-DD (N days ago)
   Funding: $XXM. Lead: investors. 1-2 sentence VC context.
 
 Sector icons: 🏥 health · 🤖 consumer AI · 💄 beauty · 🍔 CPG/food · 📦 other consumer.
