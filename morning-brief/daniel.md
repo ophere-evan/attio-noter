@@ -39,7 +39,7 @@ News story format — no emoji on Published line:
 
 *Morning Brief — [DayOfWeek] [Mon DD] | [N] events · [M] tasks · [K] news*
 
--------------------------------------
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📅 Today's Schedule
 
 [event 1 with CRM context]
@@ -48,14 +48,14 @@ News story format — no emoji on Published line:
 
 [event 3 ...]
 
--------------------------------------
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ Tasks — [M] open, [X] overdue
 
 [task 1]
 
 [task 2]
 
--------------------------------------
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📰 Consumer & VC News
 
 1. 💄 <URL|Headline> (Source)
@@ -66,5 +66,5 @@ News story format — no emoji on Published line:
    Published: YYYY-MM-DD
    Context.
 
--------------------------------------
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 _[N] events · [M] tasks · largest free block: HH:MM–HH:MM_
