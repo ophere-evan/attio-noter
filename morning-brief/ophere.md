@@ -38,7 +38,7 @@ Sector icons: beauty, health, consumer AI, CPG/food, other consumer.
 News story format — one compact paragraph per story, no separate Funding line:
   N. [sector-emoji] Headline (Source)
   Published: YYYY-MM-DD (N days ago)
-  One paragraph (3-4 sentences): what happened, key numbers (raise/valuation/revenue), why it matters for a consumer VC.
+  One paragraph (2-3 sentences max): what happened, key numbers (raise/valuation/revenue), why it matters for a consumer VC. Keep concise to stay within Slack message limits.
 
 *Morning Brief — [DayOfWeek] [Mon DD] | [N] events · [M] tasks · [K] news*
 
