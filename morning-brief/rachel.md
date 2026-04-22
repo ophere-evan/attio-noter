@@ -11,7 +11,7 @@ Rachel has shared her calendar with ophere@sticker.vc. Use the Google Calendar M
 
 Call list_events with calendarId=rachel@sticker.vc for today 00:00–23:59 Asia/Jerusalem.
 
-If that fails, fall back to calendarId=rachel@sticker.vc using the primary calendar lookup. If all fail, render "Calendar unavailable" and continue.
+If that fails, render "Calendar unavailable" and continue.
 
 ## Tasks
 
@@ -30,25 +30,30 @@ For each calendar event with external attendees:
 
 ## Message format
 
-Slack markdown DM to U096KTUE24X. Add a blank line between EVERY individual item.
+Slack markdown DM to U096KTUE24X. Add a blank line between EVERY individual item (between events, between tasks, between news stories) so nothing runs together.
+
+News story format — NO emoji on Published line:
+  N. [icon] <URL|Headline> (Source)
+  Published: YYYY-MM-DD (N days ago)
+  Funding: $XXM. Lead: investors. 1-2 sentence VC context.
 
 *Morning Brief — [DayOfWeek] [Mon DD]* | [N] events · [M] tasks · [K] news
 
-―――
+-------------------------------------
 *📅 Today's Schedule*
 
 [event 1 with CRM context]
 
 [event 2 ...]
 
-―――
+-------------------------------------
 *✅ Tasks* — [M] open, [X] overdue
 
 [task 1]
 
 [task 2]
 
-―――
+-------------------------------------
 *📰 Consumer & VC News*
 
 [news story 1]
@@ -57,5 +62,5 @@ Slack markdown DM to U096KTUE24X. Add a blank line between EVERY individual item
 
 [news story 3 ...]
 
-―――
+-------------------------------------
 _[N] events · [M] tasks · largest free block: HH:MM-HH:MM_
