@@ -1,6 +1,6 @@
 # Oren's Morning Brief
 
-- Slack user ID (send TO): U07K7Q9UQCS
+- Slack channel (send TO): C0AUAKXKAJ3 (orens-morning-brief)
 - Attio assignee ID: 32e14a57-bf26-4fd3-b11a-9ab9005d88b8
 - Timezone: Asia/Jerusalem
 
@@ -25,7 +25,7 @@ For each calendar event with external attendees:
 
 ## Message format
 
-Send as ONE single Slack message to U07K7Q9UQCS. Do not split into multiple messages.
+Send as ONE single Slack message to C0AUAKXKAJ3. Do not split into multiple messages.
 
 First line bold: *Morning Brief — [DayOfWeek] [Mon DD] | [N] events · [M] tasks · [K] news*
 
