@@ -3,7 +3,7 @@
 
 # Set MC_API_KEY to your Mailchimp API key before running
 MC_AUTH="anystring:${MC_API_KEY:?MC_API_KEY env var is required}"
-HTML_FILE="sticker_weekly_2026-06-01.html"
+HTML_FILE="sticker-weekly-2026-06-08.html"
 
 echo "Step 1: Creating campaign..."
 CAMPAIGN=$(curl -s --user "$MC_AUTH" \
@@ -16,9 +16,9 @@ CAMPAIGN=$(curl -s --user "$MC_AUTH" \
       "segment_opts": {"saved_segment_id": 10086471}
     },
     "settings": {
-      "subject_line": "The Sticker Weekly — Week of June 1, 2026",
-      "preview_text": "The dominant story this week is a tale of two DTCs: Everlane sold to Shein for $100M, while Being Frenshe cleared $250M in sales without VC. Agentic commerce goes live at Sephora, Ulta, and Olly.",
-      "title": "The Sticker Weekly — 2026-06-01",
+      "subject_line": "The Sticker Weekly — Week of June 8, 2026",
+      "preview_text": "AI infrastructure became the new distribution moat — Sephora joins Google Agentic Checkout, Suno raises $400M, and quality-first founders compound quietly.",
+      "title": "The Sticker Weekly — 2026-06-08",
       "from_name": "Sticker Ventures",
       "reply_to": "ophere@sticker.vc"
     }
