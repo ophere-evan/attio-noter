@@ -3,7 +3,7 @@
 
 # Set MC_API_KEY to your Mailchimp API key before running
 MC_AUTH="anystring:${MC_API_KEY:?MC_API_KEY env var is required}"
-HTML_FILE="sticker-weekly-2026-06-08.html"
+HTML_FILE="newsletters/sticker-weekly-2026-07-27.html"
 
 echo "Step 1: Creating campaign..."
 CAMPAIGN=$(curl -s --user "$MC_AUTH" \
@@ -16,9 +16,9 @@ CAMPAIGN=$(curl -s --user "$MC_AUTH" \
       "segment_opts": {"saved_segment_id": 10086471}
     },
     "settings": {
-      "subject_line": "The Sticker Weekly — Week of June 8, 2026",
-      "preview_text": "AI infrastructure became the new distribution moat — Sephora joins Google Agentic Checkout, Suno raises $400M, and quality-first founders compound quietly.",
-      "title": "The Sticker Weekly — 2026-06-08",
+      "subject_line": "The Sticker Weekly — Week of July 27, 2026",
+      "preview_text": "AI is becoming the infrastructure layer beneath consumer action — Whatnot buys Shaped, Instacart buys Arpalus, Utz goes private for $2.9B, and Fora hits $1B.",
+      "title": "The Sticker Weekly — 2026-07-27",
       "from_name": "Sticker Ventures",
       "reply_to": "ophere@sticker.vc"
     }
